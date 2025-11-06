@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head><title>Hi Table</title></head>
+  <body>
+    <h1>Messages</h1>
+    <table border="1">
+      <thead>
+        <tr><th>Message</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+
+    <script>
+      async function loadMessage() {
+        const res = await fetch('/api/hi');
+        const data = await res.json();
+        const tbody = document.getElementById('tbody');
+        data.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${row.message}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+      loadMessage();
+    </script>
+  </body>
+</html>

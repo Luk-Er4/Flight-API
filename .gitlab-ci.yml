@@ -1,0 +1,73 @@
+image: node:latest
+services:
+  - mysql:latest
+
+stages:
+  - test_api
+  - build_push_GitLab
+  - build_push_Azure
+  - Deploy_ACI
+
+API_Test:
+  stage: test_api
+  variables:
+    TZ: UTC
+  script:
+    - npm ci
+    - npm test -- --forceExit
+
+Docker_GitLab:
+  stage: build_push_GitLab
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/flight_api:$CI_COMMIT_REF_SLUG
+  script:
+    - echo "Logging into registry..."
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - echo "Building image..."
+    - docker build -f Dockerfile -t $IMAGE_TAG .
+    - docker tag $IMAGE_TAG $CI_REGISTRY_IMAGE:latest
+    - echo "Pushing image..."
+    - docker push $IMAGE_TAG
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+Push_Azure:
+  stage: build_push_Azure
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    AZURE_IMAGE_TAG: $ACR_LOGIN_SERVER/flight_api:latest
+  script:
+    - echo $ACR_PASSWORD | docker login $ACR_LOGIN_SERVER -u $ACR_USERNAME --password-stdin
+    - docker build -f Dockerfile -t $AZURE_IMAGE_TAG .
+    - docker push $AZURE_IMAGE_TAG
+
+Deploy_Admin_to_Azure:
+  stage: Deploy_ACI
+  image: mcr.microsoft.com/azure-cli
+  
+  variables:
+    AZURE_IMAGE_TAG: $ACR_LOGIN_SERVER/flight_api:latest
+  
+  script:
+    - echo "Logging into Azure..."
+    - az login --service-principal --username $AZURE_APP_ID --password $CLIENT_SECRET --tenant $AZURE_TENANT_ID
+    
+    - echo "Deploying container..."
+    - |
+      az container create \
+        --resource-group myself \
+        --name flightbooking \
+        --image $AZURE_IMAGE_TAG \
+        --registry-login-server $ACR_LOGIN_SERVER \
+        --registry-username $ACR_USERNAME \
+        --registry-password $ACR_PASSWORD \
+        --dns-name-label flightbkapi$RANDOM \
+        --ports 80 \
+        --os-type Linux \
+        --memory 1 \
+        --cpu 1 \
+        --location eastus
