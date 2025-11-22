@@ -1,11 +1,11 @@
 import mysql from 'mysql2/promise';
-import password from './bringpassword';
+import securityInfo from './bringpassword';
 
 const database = mysql.createPool({
-  host: password.host,
+  host: securityInfo.endpoint,
   user: "user", // user
-  password: password.password,
-  database: password.database_name,
+  password: securityInfo.password,
+  database: securityInfo.database_name,
   timezone: "Z"
 });
 
